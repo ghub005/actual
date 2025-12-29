@@ -29,6 +29,16 @@ export interface BatchCategorizationResult {
     }>;
 }
 
+// Sanitize user input to prevent prompt injection
+function sanitizeForPrompt(input: string, maxLength = 200): string {
+    return input
+        .replace(/```/g, '')           // Prevent code block escape
+        .replace(/\n{3,}/g, '\n\n')    // Limit consecutive newlines
+        .replace(/[<>]/g, '')          // Remove angle brackets
+        .slice(0, maxLength)           // Limit length
+        .trim();
+}
+
 export function buildCategorizationPrompt(
     transaction: TransactionInput,
     categories: Category[],
@@ -55,11 +65,11 @@ Be precise and consistent. When uncertain, indicate lower confidence. Always res
     const userPrompt = `Categorize this transaction:
 
 ## Transaction Details
-- Payee: ${transaction.payee}
-${transaction.importedPayee ? `- Raw Bank Payee: ${transaction.importedPayee}` : ''}
+- Payee: ${sanitizeForPrompt(transaction.payee)}
+${transaction.importedPayee ? `- Raw Bank Payee: ${sanitizeForPrompt(transaction.importedPayee)}` : ''}
 - Amount: $${amountStr} (${txnType})
 - Date: ${transaction.date}
-${transaction.notes ? `- Notes: ${transaction.notes}` : ''}
+${transaction.notes ? `- Notes: ${sanitizeForPrompt(transaction.notes, 500)}` : ''}
 
 ## Available Categories
 ${categoryList}

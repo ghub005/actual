@@ -24,9 +24,9 @@ const predictRequestSchema = z.object({
     }),
     categories: z.array(z.object({
         id: z.string(),
-        name: z.string(),
-        groupName: z.string().optional(),
-    })),
+        name: z.string().max(100),
+        groupName: z.string().max(100).optional(),
+    })).max(200),
     recentCorrections: z.array(z.object({
         payee: z.string(),
         category: z.string(),
@@ -116,7 +116,8 @@ predictRouter.post('/predict', async (req, res) => {
         const result = parseCategorizationResponse(response.content);
 
         if (!result) {
-            res.status(422).json({ error: 'Failed to parse LLM response', raw: response.content });
+            console.error('LLM parse failed:', response.content);
+            res.status(422).json({ error: 'Failed to parse LLM response' });
             return;
         }
 

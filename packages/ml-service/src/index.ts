@@ -22,11 +22,41 @@ const app = express();
 
 app.use(express.json({ limit: '1mb' }));
 
-// CORS for development
-app.use((_req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
+// Authentication middleware
+const API_KEY = process.env.ML_SERVICE_API_KEY;
+
+app.use((req, res, next) => {
+    // Allow health checks without auth
+    if (req.path === '/health' || req.method === 'OPTIONS') {
+        return next();
+    }
+
+    // In development, auth is optional
+    if (!API_KEY) {
+        return next();
+    }
+
+    const authHeader = req.headers.authorization;
+    if (authHeader !== `Bearer ${API_KEY}`) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+    }
+    next();
+});
+
+// CORS - configurable origins
+const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || 'http://localhost:3001').split(',');
+
+app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin && ALLOWED_ORIGINS.includes(origin)) {
+        res.header('Access-Control-Allow-Origin', origin);
+    } else if (!origin) {
+        // Allow requests without origin (same-origin, curl, etc.)
+        res.header('Access-Control-Allow-Origin', ALLOWED_ORIGINS[0]);
+    }
     res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     next();
 });
 
