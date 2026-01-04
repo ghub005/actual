@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  actual-server:
+    build:
+      context: .
+      dockerfile: sync-server.Dockerfile
+    ports:
+      - "5006:5006"
+    volumes:
+      - actual-data:/data
+    environment:
+      - ACTUAL_PORT=5006
+      - ACTUAL_UPLOAD_FILE_SIZE_LIMIT_MB=20
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:5006/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  ml-service:
+    build:
+      context: ./packages/ml-service
+      dockerfile: Dockerfile
+    ports:
+      - "3050:3050"
+    environment:
+      - ML_SERVICE_PORT=3050
+      - ML_PRIMARY_PROVIDER=claude
+      - ML_DAILY_TOKEN_LIMIT=50000
+      - ML_BATCH_SIZE=10
+      - ML_CONFIDENCE_THRESHOLD=0.7
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    volumes:
+      - ml-data:/app/data
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:3050/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    depends_on:
+      - actual-server
+  # Optional: MCP server for Claude Desktop (run locally, not in container)
+  # mcp-server:
+  #   build:
+  #     context: ./packages/mcp-server
+  #   environment:
+  #     - ACTUAL_SERVER_URL=http://actual-server:5006
+  #     - ACTUAL_PASSWORD=${ACTUAL_PASSWORD}
+  #     - ACTUAL_BUDGET_ID=${ACTUAL_BUDGET_ID}
+
+volumes:
+  actual-data:
+    driver: local
+  ml-data:
+    driver: local
+
+networks:
+  default:
+    name: actual-plus-network
